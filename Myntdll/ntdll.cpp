@@ -1,11 +1,11 @@
 
 
 #include<iostream>
-#include<Windows.h>
-#include"XorLib.h"
+
+
 #include"ntdll.h"
 #include <stdarg.h>
-#include<Psapi.h>
+
 #include<unordered_map>
 constexpr auto USERADDR_MIN = 0x10000;
 #if defined _WIN64
@@ -71,28 +71,6 @@ private:
         return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))() : Ty();//__stdcall 
     }
 };
-PIMAGE_NT_HEADERS GetNtHeader(LPVOID buffer) {
-    auto pDosHeader = (PIMAGE_DOS_HEADER)buffer;
-    if (!pDosHeader) return nullptr;
-    if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE) return nullptr;
-    auto pNtHeader = (PIMAGE_NT_HEADERS)((UDWORD)buffer + pDosHeader->e_lfanew);
-    if (pNtHeader->Signature != IMAGE_NT_SIGNATURE || !pNtHeader) return nullptr;
-    return pNtHeader;
-}
-FARPROC GetFunctionByName(LPVOID pDllImageBuffer, LPCSTR lpszFunc) {
-        PIMAGE_NT_HEADERS pNtHeader = GetNtHeader(pDllImageBuffer);
-        PIMAGE_EXPORT_DIRECTORY pExport = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pDllImageBuffer +
-            pNtHeader->OptionalHeader.DataDirectory[0].VirtualAddress);
-        PDWORD AddressOfFunctions = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfFunctions);
-        PDWORD AddressOfNames = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfNames);
-        PUSHORT AddressOfNameOrdinals = (PUSHORT)((PBYTE)pDllImageBuffer + pExport->AddressOfNameOrdinals);
-        for (size_t i = 0; i < pExport->NumberOfNames; i++) {
-            if (0 == strcmp(lpszFunc, (char*)pDllImageBuffer + AddressOfNames[i])) {
-                return (FARPROC)(AddressOfFunctions[AddressOfNameOrdinals[i]] + (PBYTE)pDllImageBuffer);
-            }
-        }
-        return NULL;
-}
 std::string GetSystem32Path() {
     char szSystemDir[MAX_PATH] = { 0 };
     GetSystemDirectoryA(szSystemDir, MAX_PATH);
@@ -154,8 +132,32 @@ HMODULE ReloadSystemdll(const char* lpszdllname) {
     }
     return (HMODULE)BaseAddr;
 }
+PIMAGE_NT_HEADERS GetNtHeader(LPVOID buffer) {
+    auto pDosHeader = (PIMAGE_DOS_HEADER)buffer;
+    if (!pDosHeader) return nullptr;
+    if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE) return nullptr;
+    auto pNtHeader = (PIMAGE_NT_HEADERS)((UDWORD)buffer + pDosHeader->e_lfanew);
+    if (pNtHeader->Signature != IMAGE_NT_SIGNATURE || !pNtHeader) return nullptr;
+    return pNtHeader;
+}
+FARPROC GetFunctionByName(LPVOID pDllImageBuffer, LPCSTR lpszFunc) {
+    if (pDllImageBuffer == NULL) pDllImageBuffer = ReloadSystemdll("ntdll.dll");
+        PIMAGE_NT_HEADERS pNtHeader = GetNtHeader(pDllImageBuffer);
+        PIMAGE_EXPORT_DIRECTORY pExport = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pDllImageBuffer +
+            pNtHeader->OptionalHeader.DataDirectory[0].VirtualAddress);
+        PDWORD AddressOfFunctions = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfFunctions);
+        PDWORD AddressOfNames = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfNames);
+        PUSHORT AddressOfNameOrdinals = (PUSHORT)((PBYTE)pDllImageBuffer + pExport->AddressOfNameOrdinals);
+        for (size_t i = 0; i < pExport->NumberOfNames; i++) {
+            if (0 == strcmp(lpszFunc, (char*)pDllImageBuffer + AddressOfNames[i])) {
+                return (FARPROC)(AddressOfFunctions[AddressOfNameOrdinals[i]] + (PBYTE)pDllImageBuffer);
+            }
+        }
+        return NULL;
+}
+
 #pragma region NATIVE API
-HMODULE hNtdll =GetModuleHandleA("ntdll.dll");
+HMODULE hNtdll =nullptr;
      EXPORT NTSTATUS NTAPI NtAcceptConnectPort(
         OUT    PHANDLE PortHandle,
         IN    PVOID  PortContext OPTIONAL,

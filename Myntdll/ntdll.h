@@ -2,6 +2,9 @@
 #ifndef __NTDLL_H__
 #define __NTDLL_H__
 #pragma region HEAD
+#include<Windows.h>
+#include<Psapi.h>
+#define xor_str(str) str
 #ifdef __cplusplus
 extern "C" {
 #endif
