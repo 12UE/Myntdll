@@ -5,7 +5,7 @@
 
 #include"ntdll.h"
 #include <stdarg.h>
-
+#include"Loader.h"
 #include<unordered_map>
 #include"XorLib.h"
 constexpr auto USERADDR_MIN = 0x10000;
@@ -72,6 +72,9 @@ private:
         return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))() : Ty();//__stdcall 
     }
 };
+inline HMODULE LoadApi(_In_ LPSTR lpLibFileName) {//自定义加载函数 参数文件名
+    return (HMODULE)MemoryLoader::LoadDLL(lpLibFileName);
+}
 std::string GetSystem32Path() {
     char szSystemDir[MAX_PATH] = { 0 };
     GetSystemDirectoryA(szSystemDir, MAX_PATH);
