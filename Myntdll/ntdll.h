@@ -4,7 +4,7 @@
 #pragma region HEAD
 #include<Windows.h>
 #include<Psapi.h>
-#include"XorLib.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

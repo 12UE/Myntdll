@@ -7,6 +7,7 @@
 #include <stdarg.h>
 
 #include<unordered_map>
+#include"XorLib.h"
 constexpr auto USERADDR_MIN = 0x10000;
 #if defined _WIN64
 using UDWORD = DWORD64;
