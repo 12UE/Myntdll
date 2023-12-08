@@ -3622,6 +3622,24 @@ HMODULE hNtdll =nullptr;
         return pLdrGetProcedureAddress(DllHandle, ProcedureName, ProcedureNumber, ProcedureAddress);
     }
 
+     NTSTATUS NtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PCLIENT_ID ClientId, PCONTEXT ThreadContext, PINITIAL_TEB InitialTeb, BOOLEAN CreateSuspended)
+     {
+         static function<NTSTATUS> pNtCreateThread = (void*)GetFunctionByName(hNtdll, xor_str("NtCreateThread"));
+        return pNtCreateThread(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, ClientId, ThreadContext, InitialTeb, CreateSuspended);
+     }
+
+     NTSTATUS NtGetThreadContext(HANDLE ThreadHandle, PCONTEXT Context)
+     {
+        static function<NTSTATUS> pNtGetThreadContext = (void*)GetFunctionByName(hNtdll, xor_str("NtGetThreadContext"));
+        return pNtGetThreadContext(ThreadHandle, Context);
+     }
+
+     NTSTATUS NtSetThreadContext(HANDLE ThreadHandle, PCONTEXT Context)
+     {
+         static function<NTSTATUS> pNtSetThreadContext = (void*)GetFunctionByName(hNtdll, xor_str("NtSetThreadContext"));
+        return pNtSetThreadContext(ThreadHandle, Context);
+     }
+    
 #pragma endregion
 
 #pragma endregion

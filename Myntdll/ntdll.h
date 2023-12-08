@@ -1018,6 +1018,15 @@ extern "C" {
         PVOID Win32ThreadInfo;
     } TEB, * PTEB;
 
+    typedef struct _INITIAL_TEB
+    {
+        PVOID                StackBase;
+        PVOID                StackLimit;
+        PVOID                StackCommit;
+        PVOID                StackCommitMax;
+        PVOID                StackReserved;
+    } INITIAL_TEB, * PINITIAL_TEB;
+
     typedef struct _PROCESS_BASIC_INFORMATION
     {
         NTSTATUS  ExitStatus;
@@ -5305,7 +5314,24 @@ extern "C" {
         IN    ULONG ProcedureNumber OPTIONAL,
         OUT    PVOID* ProcedureAddress
     );
-
+    EXPORT NTSTATUS NTAPI NtCreateThread(
+        PHANDLE ThreadHandle,
+        ACCESS_MASK DesiredAccess,
+        POBJECT_ATTRIBUTES ObjectAttributes,
+        HANDLE ProcessHandle,
+        PCLIENT_ID ClientId,
+        PCONTEXT ThreadContext,
+        PINITIAL_TEB InitialTeb,
+        BOOLEAN CreateSuspended
+    );
+    EXPORT NTSTATUS NTAPI NtGetThreadContext(
+        HANDLE ThreadHandle,
+        PCONTEXT Context
+    );
+    EXPORT NTSTATUS NTAPI NtSetThreadContext(
+        HANDLE ThreadHandle,
+        PCONTEXT Context
+    );
 #pragma endregion
 
 #pragma region TAIL
