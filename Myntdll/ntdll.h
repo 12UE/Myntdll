@@ -34,7 +34,7 @@ extern "C" {
 #endif // ASSERT
 #pragma endregion
 #pragma region DEFINE
-#define EXPORT extern "C" __declspec(dllexport)
+#define EXPORT extern "C" __declspec(dllexport) __forceinline
 #define DEVICE_TYPE DWORD
 #define FLG_STOP_ON_EXCEPTION            0x0000001L
 #define FLG_SHOW_LDR_SNAPS                0x0000002L
