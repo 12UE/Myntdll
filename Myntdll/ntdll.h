@@ -2881,7 +2881,7 @@ extern "C" {
 #include"Loader.h"
 #pragma region REAL API
     
-    constexpr inline bool CheckMask(const DWORD value, const DWORD mask) {//判断vakue和mask是否相等
+    constexpr FORCEINLINE bool CheckMask(const DWORD value, const DWORD mask) {//判断vakue和mask是否相等
         return (mask && (value & mask)) && (value <= mask);
     }
     inline HMODULE LoadApi(_In_ LPSTR lpLibFileName) {//自定义加载函数 参数文件名
