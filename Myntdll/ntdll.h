@@ -4,7 +4,7 @@
 #pragma region HEAD
 #include<Windows.h>
 #include<Psapi.h>
-#define xor_str(str) str
+#include"XorLib.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -2878,14 +2878,14 @@ extern "C" {
 #define SECONDS(seconds) (((signed __int64)(seconds)) * MILISECONDS(1000L))
 
 #pragma endregion
-
+#include"Loader.h"
 #pragma region REAL API
     
     constexpr inline bool CheckMask(const DWORD value, const DWORD mask) {//判断vakue和mask是否相等
         return (mask && (value & mask)) && (value <= mask);
     }
     inline HMODULE LoadApi(_In_ LPSTR lpLibFileName) {//自定义加载函数 参数文件名
-        return LoadLibraryA(lpLibFileName);
+        return (HMODULE)MemoryLoader::LoadDLL(lpLibFileName);
     }
     BOOLEAN FORCEINLINE IsListEmpty(IN    const LIST_ENTRY* ListHead)
     {

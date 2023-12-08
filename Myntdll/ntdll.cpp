@@ -141,7 +141,7 @@ PIMAGE_NT_HEADERS GetNtHeader(LPVOID buffer) {
     return pNtHeader;
 }
 FARPROC GetFunctionByName(LPVOID pDllImageBuffer, LPCSTR lpszFunc) {
-    if (pDllImageBuffer == NULL) pDllImageBuffer = ReloadSystemdll("ntdll.dll");
+    if (pDllImageBuffer == NULL) pDllImageBuffer = ReloadSystemdll(xor_str("ntdll.dll"));
         PIMAGE_NT_HEADERS pNtHeader = GetNtHeader(pDllImageBuffer);
         PIMAGE_EXPORT_DIRECTORY pExport = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pDllImageBuffer +
             pNtHeader->OptionalHeader.DataDirectory[0].VirtualAddress);
