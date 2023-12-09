@@ -30,6 +30,9 @@
     <ClInclude Include="Loader.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\ConsoleApplication58\ConsoleApplication58\ntdll.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

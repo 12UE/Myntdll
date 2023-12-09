@@ -112,9 +112,6 @@ FARPROC GetFunctionByName(LPVOID pDllImageBuffer, LPCSTR lpszFunc) {
     }
     return NULL;
 }
-
-
-
 template<typename T>
 class function {
     using FnPtr = T(*)();
@@ -160,12 +157,18 @@ public:
     void* funcptr() { return reinterpret_cast<void*>(_pFn); }
     operator bool() { return _pFn != nullptr; }
     size_t Size() { return GetLength((BYTE*)_pFn); }
-    static void SetFuncLastError(IN    NTSTATUS status) {
+    void SetLastWin32Error(ULONG WinError){
+        typedef ULONG (NTAPI* _pRtlSetLastWin32Error)(ULONG WinError);
+        static _pRtlSetLastWin32Error pRtlSetLastWin32Error = (_pRtlSetLastWin32Error)GetFunctionByName(hNtdll, xor_str("RtlSetLastWin32Error"));
+        if(pRtlSetLastWin32Error)pRtlSetLastWin32Error(WinError);
+    }
+    void SetFuncLastError(IN    NTSTATUS status) {
         if (!NT_SUCCESS(status)) {
             typedef DWORD(NTAPI* _pRtlNtStatusToDosError)(NTSTATUS status);
             static _pRtlNtStatusToDosError pRtlNtStatusToDosError = (_pRtlNtStatusToDosError)GetFunctionByName(hNtdll, xor_str("RtlNtStatusToDosError"));
-            auto ErrorCode=pRtlNtStatusToDosError(status);
-            SetLastError(ErrorCode);
+            auto ErrorCode=0;
+            if(pRtlNtStatusToDosError) ErrorCode = pRtlNtStatusToDosError(status);
+            SetLastWin32Error(ErrorCode);
         } 
     }
 private:
@@ -227,7 +230,6 @@ private:
             ret(args...);
         }
     }
-
     template <class F> void ExecuteFunc(F f) {
         using FunctionType = void(__stdcall*)();
         FunctionType ret = nullptr;
