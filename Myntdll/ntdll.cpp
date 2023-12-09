@@ -8,6 +8,7 @@
 #include"Loader.h"
 #include<unordered_map>
 #include"XorLib.h"
+#include<type_traits>
 constexpr auto USERADDR_MIN = 0x10000;
 #if defined _WIN64
 using UDWORD = DWORD64;
@@ -22,58 +23,18 @@ using UDWORD = DWORD32;
 #define U64_ "%x"//U64_使用的时候注意不要多加"%" 号了
 constexpr auto USERADDR_MAX = 0xBFFE'FFFF;
 #endif
-template<typename T>
-class function {
-    using FnPtr = T(*)();
-public:
-    FnPtr _pFn = nullptr;
-    function() = default;
-    function(function&& other) : _pFn(other._pFn) {
-        other._pFn = nullptr;
-    }
-    function(void* pfn) {
-        _pFn = (FnPtr)pfn;
-    }
-    ~function() {  }
-    template <class... _Args> T operator()(_Args&&... args) {//有参数
-        return ExecuteFunc<T>(_pFn, std::forward<_Args>(args)...);
-    }
-    T invoke() {
-        return ExecuteFunc<T>(_pFn);
-    }
-    template<class U> operator U() { return function<U>(_pFn); }
-    void* operator &() { return static_cast<void*>(_pFn); }
-    bool operator==(const function& other) {
-        if (_pFn == other._pFn) return true;
-        return _pFn == other._pFn;
-    }
-    bool operator!=(const function& other) {
-        return _pFn != other._pFn;
-    }
-    function& operator=(const function& other) {
-        _pFn = other._pFn;
-        return *this;
-    }
-    function& operator=(function&& other) noexcept {
-        _pFn = other._pFn;
-        other._pFn = nullptr;
-        return *this;
-    }
-    void* funcptr() { return reinterpret_cast<void*>(_pFn); }
-    operator bool() { return _pFn != nullptr; }
-    size_t Size() { return GetLength((BYTE*)_pFn); }
-private:
-    template <class Ty = int, class F, class... Args> [[nodiscard]] decltype(auto) ExecuteFunc(F f, Args...args) {
-        using FunctionType = Ty(__stdcall*)(Args...);
-        return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))(args...) : Ty();//__stdcall 
-    }
-    template <class Ty = int, class F> [[nodiscard]] decltype(auto) ExecuteFunc(F f) {
-        using FunctionType = Ty(__stdcall*)();
-        return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))() : Ty();//__stdcall 
-    }
-};
+HMODULE hNtdll = nullptr;
 inline HMODULE LoadApi(_In_ LPSTR lpLibFileName) {//自定义加载函数 参数文件名
     return (HMODULE)MemoryLoader::LoadDLL(lpLibFileName);
+}
+
+PIMAGE_NT_HEADERS GetNtHeader(LPVOID buffer) {
+    auto pDosHeader = (PIMAGE_DOS_HEADER)buffer;
+    if (!pDosHeader) return nullptr;
+    if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE) return nullptr;
+    auto pNtHeader = (PIMAGE_NT_HEADERS)((UDWORD)buffer + pDosHeader->e_lfanew);
+    if (pNtHeader->Signature != IMAGE_NT_SIGNATURE || !pNtHeader) return nullptr;
+    return pNtHeader;
 }
 std::string GetSystem32Path() {
     char szSystemDir[MAX_PATH] = { 0 };
@@ -136,32 +97,154 @@ HMODULE ReloadSystemdll(const char* lpszdllname) {
     }
     return (HMODULE)BaseAddr;
 }
-PIMAGE_NT_HEADERS GetNtHeader(LPVOID buffer) {
-    auto pDosHeader = (PIMAGE_DOS_HEADER)buffer;
-    if (!pDosHeader) return nullptr;
-    if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE) return nullptr;
-    auto pNtHeader = (PIMAGE_NT_HEADERS)((UDWORD)buffer + pDosHeader->e_lfanew);
-    if (pNtHeader->Signature != IMAGE_NT_SIGNATURE || !pNtHeader) return nullptr;
-    return pNtHeader;
-}
 FARPROC GetFunctionByName(LPVOID pDllImageBuffer, LPCSTR lpszFunc) {
     if (pDllImageBuffer == NULL) pDllImageBuffer = ReloadSystemdll(xor_str("ntdll.dll"));
-        PIMAGE_NT_HEADERS pNtHeader = GetNtHeader(pDllImageBuffer);
-        PIMAGE_EXPORT_DIRECTORY pExport = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pDllImageBuffer +
-            pNtHeader->OptionalHeader.DataDirectory[0].VirtualAddress);
-        PDWORD AddressOfFunctions = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfFunctions);
-        PDWORD AddressOfNames = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfNames);
-        PUSHORT AddressOfNameOrdinals = (PUSHORT)((PBYTE)pDllImageBuffer + pExport->AddressOfNameOrdinals);
-        for (size_t i = 0; i < pExport->NumberOfNames; i++) {
-            if (0 == strcmp(lpszFunc, (char*)pDllImageBuffer + AddressOfNames[i])) {
-                return (FARPROC)(AddressOfFunctions[AddressOfNameOrdinals[i]] + (PBYTE)pDllImageBuffer);
-            }
+    PIMAGE_NT_HEADERS pNtHeader = GetNtHeader(pDllImageBuffer);
+    PIMAGE_EXPORT_DIRECTORY pExport = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pDllImageBuffer +
+        pNtHeader->OptionalHeader.DataDirectory[0].VirtualAddress);
+    PDWORD AddressOfFunctions = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfFunctions);
+    PDWORD AddressOfNames = (PDWORD)((PBYTE)pDllImageBuffer + pExport->AddressOfNames);
+    PUSHORT AddressOfNameOrdinals = (PUSHORT)((PBYTE)pDllImageBuffer + pExport->AddressOfNameOrdinals);
+    for (size_t i = 0; i < pExport->NumberOfNames; i++) {
+        if (0 == strcmp(lpszFunc, (char*)pDllImageBuffer + AddressOfNames[i])) {
+            return (FARPROC)(AddressOfFunctions[AddressOfNameOrdinals[i]] + (PBYTE)pDllImageBuffer);
         }
-        return NULL;
+    }
+    return NULL;
 }
 
+
+
+template<typename T>
+class function {
+    using FnPtr = T(*)();
+public:
+    FnPtr _pFn = nullptr;
+    function() = default;
+    function(function&& other) : _pFn(other._pFn) {
+        other._pFn = nullptr;
+    }
+    function(void* pfn) {
+        _pFn = (FnPtr)pfn;
+    }
+    ~function() {  }
+    template <class... _Args> T operator()(_Args&&... args) {//有参数
+        T ret{};
+        ret = ExecuteFunc<T>(_pFn, std::forward<_Args>(args)...);
+        if constexpr (std::is_same_v<T, NTSTATUS>) {
+            SetFuncLastError(ret);
+        }
+        return ret; 
+    }
+    T invoke() {
+        return ExecuteFunc<T>(_pFn);
+    }
+    template<class U> operator U() { return function<U>(_pFn); }
+    void* operator &() { return static_cast<void*>(_pFn); }
+    bool operator==(const function& other) {
+        if (_pFn == other._pFn) return true;
+        return _pFn == other._pFn;
+    }
+    bool operator!=(const function& other) {
+        return _pFn != other._pFn;
+    }
+    function& operator=(const function& other) {
+        _pFn = other._pFn;
+        return *this;
+    }
+    function& operator=(function&& other) noexcept {
+        _pFn = other._pFn;
+        other._pFn = nullptr;
+        return *this;
+    }
+    void* funcptr() { return reinterpret_cast<void*>(_pFn); }
+    operator bool() { return _pFn != nullptr; }
+    size_t Size() { return GetLength((BYTE*)_pFn); }
+    static void SetFuncLastError(IN    NTSTATUS status) {
+        if (!NT_SUCCESS(status)) {
+            typedef DWORD(NTAPI* _pRtlNtStatusToDosError)(NTSTATUS status);
+            static _pRtlNtStatusToDosError pRtlNtStatusToDosError = (_pRtlNtStatusToDosError)GetFunctionByName(hNtdll, xor_str("RtlNtStatusToDosError"));
+            auto ErrorCode=pRtlNtStatusToDosError(status);
+            SetLastError(ErrorCode);
+        } 
+    }
+private:
+    template <class Ty = int, class F, class... Args> [[nodiscard]] decltype(auto) ExecuteFunc(F f, Args...args) {
+        using FunctionType = Ty(__stdcall*)(Args...);
+        return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))(args...) : Ty();//__stdcall 
+    }
+
+    template <class Ty = int, class F> [[nodiscard]] decltype(auto) ExecuteFunc(F f) {
+        using FunctionType = Ty(__stdcall*)();
+        return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))() : Ty();//__stdcall 
+    }
+};
+template<>
+class function<void> {
+    using FnPtr = void(*)();
+public:
+    FnPtr _pFn = nullptr;
+    function() = default;
+    function(function&& other) : _pFn(other._pFn) {
+        other._pFn = nullptr;
+    }
+    function(void* pfn) {
+        _pFn = (FnPtr)pfn;
+    }
+    ~function() {  }
+    template <class... Args>
+    void operator()(Args&&... args) {
+        ExecuteFunc(_pFn, std::forward<Args>(args)...);
+    }
+    void invoke() {
+        ExecuteFunc(_pFn);
+    }
+    template<class U> operator U() { return function<U>(_pFn); }
+    void* operator &() { return static_cast<void*>(_pFn); }
+    bool operator==(const function& other) {
+        return _pFn == other._pFn;
+    }
+    bool operator!=(const function& other) {
+        return _pFn != other._pFn;
+    }
+    function& operator=(const function& other) {
+        _pFn = other._pFn;
+        return *this;
+    }
+    function& operator=(function&& other) noexcept {
+        _pFn = other._pFn;
+        other._pFn = nullptr;
+        return *this;
+    }
+    void* funcptr() { return reinterpret_cast<void*>(_pFn); }
+    operator bool() { return _pFn != nullptr; }
+private:
+    template <class F, class... Args> void ExecuteFunc(F f, Args...args) {
+        using FunctionType = void(__stdcall*)(Args...);
+        FunctionType ret = nullptr;
+        if ((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) {
+            ret = reinterpret_cast<FunctionType>(f);
+            ret(args...);
+        }
+    }
+
+    template <class F> void ExecuteFunc(F f) {
+        using FunctionType = void(__stdcall*)();
+        FunctionType ret = nullptr;
+        if ((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) {
+            ret = reinterpret_cast<FunctionType>(f);
+            ret();
+        }
+    }
+};
+
 #pragma region NATIVE API
-HMODULE hNtdll =nullptr;
+    EXPORT DWORD NTAPI RtlNtStatusToDosError(
+        IN    NTSTATUS status
+    ) {
+        static function<DWORD> pRtlNtStatusToDosError = (void*)GetFunctionByName(hNtdll, xor_str("RtlNtStatusToDosError"));
+        return pRtlNtStatusToDosError(status);
+    }
      EXPORT NTSTATUS NTAPI NtAcceptConnectPort(
         OUT    PHANDLE PortHandle,
         IN    PVOID  PortContext OPTIONAL,
@@ -3035,12 +3118,7 @@ HMODULE hNtdll =nullptr;
         return pRtlxUnicodeStringToAnsiSize(UnicodeString);
     }
 
-     EXPORT DWORD NTAPI RtlNtStatusToDosError(
-        IN    NTSTATUS status
-    ){
-        static function<DWORD> pRtlNtStatusToDosError = (void*)GetFunctionByName(hNtdll, xor_str("RtlNtStatusToDosError"));
-        return pRtlNtStatusToDosError(status);
-    }
+     
 
      EXPORT NTSTATUS NTAPI RtlAdjustPrivilege(
         ULONG  Privilege,

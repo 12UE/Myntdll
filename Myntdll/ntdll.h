@@ -318,24 +318,7 @@ extern "C" {
         MaximumWaitReason
     } KWAIT_REASON;
 
-    typedef enum _POOL_TYPE
-    {
-        NonPagedPool,
-        PagedPool,
-        NonPagedPoolMustSucceed,
-        DontUseThisType,
-        NonPagedPoolCacheAligned,
-        PagedPoolCacheAligned,
-        NonPagedPoolCacheAlignedMustS,
-        MaxPoolType,
-        NonPagedPoolSession = 32,
-        PagedPoolSession,
-        NonPagedPoolMustSucceedSession,
-        DontUseThisTypeSession,
-        NonPagedPoolCacheAlignedSession,
-        PagedPoolCacheAlignedSession,
-        NonPagedPoolCacheAlignedMustSSession
-    } POOL_TYPE;
+
 
     typedef enum _THREAD_STATE
     {
@@ -349,36 +332,7 @@ extern "C" {
         StateUnknown
     } THREAD_STATE;
 
-    typedef enum _SYSTEM_HANDLE_TYPE
-    {
-        OB_TYPE_UNKNOWN,
-        OB_TYPE_TYPE,
-        OB_TYPE_DIRECTORY,
-        OB_TYPE_SYMBOLIC_LINK,
-        OB_TYPE_TOKEN,
-        OB_TYPE_PROCESS,
-        OB_TYPE_THREAD,
-        OB_TYPE_UNKNOWN_7,
-        OB_TYPE_EVENT,
-        OB_TYPE_EVENT_PAIR,
-        OB_TYPE_MUTANT,
-        OB_TYPE_UNKNOWN_11,
-        OB_TYPE_SEMAPHORE,
-        OB_TYPE_TIMER,
-        OB_TYPE_PROFILE,
-        OB_TYPE_WINDOW_STATION,
-        OB_TYPE_DESKTOP,
-        OB_TYPE_SECTION,
-        OB_TYPE_KEY,
-        OB_TYPE_PORT,
-        OB_TYPE_WAITABLE_PORT,
-        OB_TYPE_UNKNOWN_21,
-        OB_TYPE_UNKNOWN_22,
-        OB_TYPE_UNKNOWN_23,
-        OB_TYPE_UNKNOWN_24,
-        OB_TYPE_IO_COMPLETION,
-        OB_TYPE_FILE
-    }SYSTEM_HANDLE_TYPE;
+   
 
     typedef enum _DEBUG_CONTROL_CODE
     {
@@ -539,12 +493,6 @@ extern "C" {
         SynchronizationEvent
     } EVENT_TYPE;
 
-    typedef enum _RTL_GENERIC_COMPARE_RESULTS
-    {
-        GenericLessThan,
-        GenericGreaterThan,
-        GenericEqual
-    } RTL_GENERIC_COMPARE_RESULTS;
 
     typedef enum _SECTION_INHERIT
     {
@@ -743,15 +691,6 @@ extern "C" {
         FileMaximumInformation
     } FILE_INFORMATION_CLASS, * PFILE_INFORMATION_CLASS;
 
-    typedef enum _IO_PRIORITY_HINT
-    {
-        IoPriorityVeryLow,
-        IoPriorityLow,
-        IoPriorityNormal,
-        IoPriorityHigh,
-        IoPriorityCritical,
-        MaxIoPriorityTypes
-    } IO_PRIORITY_HINT;
 
     typedef enum _FSINFOCLASS
     {
