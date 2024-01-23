@@ -112,6 +112,54 @@ FARPROC GetFunctionByName(LPVOID pDllImageBuffer, LPCSTR lpszFunc) {
     }
     return NULL;
 }
+void SetLastWin32Error(ULONG WinError) {
+    typedef ULONG(NTAPI* _pRtlSetLastWin32Error)(ULONG WinError);
+    static _pRtlSetLastWin32Error pRtlSetLastWin32Error = (_pRtlSetLastWin32Error)GetFunctionByName(hNtdll, xor_str("RtlSetLastWin32Error"));
+    if (pRtlSetLastWin32Error)pRtlSetLastWin32Error(WinError);
+}
+void SetFuncLastError(IN    NTSTATUS status) {
+    if (!NT_SUCCESS(status)) {
+        typedef DWORD(NTAPI* _pRtlNtStatusToDosError)(NTSTATUS status);
+        static _pRtlNtStatusToDosError pRtlNtStatusToDosError = (_pRtlNtStatusToDosError)GetFunctionByName(hNtdll, xor_str("RtlNtStatusToDosError"));
+        auto ErrorCode = 0;
+        if (pRtlNtStatusToDosError) ErrorCode = pRtlNtStatusToDosError(status);
+        SetLastWin32Error(ErrorCode);
+    }
+}
+class NormalStatus {
+public:
+    inline static NTSTATUS InvalidStatuc() {
+        return NULL;
+    }
+};
+template<class T,class Traits>
+class NTSTATUSHANDLER {
+private:
+    T status;
+    bool Own;
+public:
+    NTSTATUSHANDLER(const T& _status, bool _Own = false) :status(_status), Own(_Own) {}
+    ~NTSTATUSHANDLER(){
+        SetFuncLastError(status);
+        status = Traits::InvalidStatuc();
+    }
+    //转换为bool类型
+    operator bool() const {
+        return NT_SUCCESS(status);
+    }
+    //转换为T类型
+    operator T() const {
+        return status;
+    }
+    //判等
+    bool operator==(const T& _status) const {
+        return status == _status;
+    }
+    //判不等
+    bool operator!=(const T& _status) const {
+        return status != _status;
+    }
+};
 template<typename T>
 class function {
     using FnPtr = T(*)();
@@ -129,12 +177,17 @@ public:
         T ret{};
         ret = ExecuteFunc<T>(_pFn, std::forward<_Args>(args)...);
         if constexpr (std::is_same_v<T, NTSTATUS>) {
-            SetFuncLastError(ret);
+            NTSTATUSHANDLER<T, NormalStatus> handler(ret);
         }
         return ret; 
     }
     T invoke() {
-        return ExecuteFunc<T>(_pFn);
+        T ret{};
+        ret = ExecuteFunc<T>(_pFn);
+        if constexpr (std::is_same_v<T, NTSTATUS>) {
+            NTSTATUSHANDLER<T, NormalStatus> handler(ret);
+        }
+        return ret;
     }
     template<class U> operator U() { return function<U>(_pFn); }
     void* operator &() { return static_cast<void*>(_pFn); }
@@ -157,20 +210,8 @@ public:
     void* funcptr() { return reinterpret_cast<void*>(_pFn); }
     operator bool() { return _pFn != nullptr; }
     size_t Size() { return GetLength((BYTE*)_pFn); }
-    void SetLastWin32Error(ULONG WinError){
-        typedef ULONG (NTAPI* _pRtlSetLastWin32Error)(ULONG WinError);
-        static _pRtlSetLastWin32Error pRtlSetLastWin32Error = (_pRtlSetLastWin32Error)GetFunctionByName(hNtdll, xor_str("RtlSetLastWin32Error"));
-        if(pRtlSetLastWin32Error)pRtlSetLastWin32Error(WinError);
-    }
-    void SetFuncLastError(IN    NTSTATUS status) {
-        if (!NT_SUCCESS(status)) {
-            typedef DWORD(NTAPI* _pRtlNtStatusToDosError)(NTSTATUS status);
-            static _pRtlNtStatusToDosError pRtlNtStatusToDosError = (_pRtlNtStatusToDosError)GetFunctionByName(hNtdll, xor_str("RtlNtStatusToDosError"));
-            auto ErrorCode=0;
-            if(pRtlNtStatusToDosError) ErrorCode = pRtlNtStatusToDosError(status);
-            SetLastWin32Error(ErrorCode);
-        } 
-    }
+    
+    
 private:
     template <class Ty = int, class F, class... Args> [[nodiscard]] decltype(auto) ExecuteFunc(F f, Args...args) {
         using FunctionType = Ty(__stdcall*)(Args...);
