@@ -173,21 +173,29 @@ public:
         _pFn = (FnPtr)pfn;
     }
     ~function() {  }
-    template <class... _Args> T operator()(_Args&&... args) {//有参数
-        T ret{};
-        ret = ExecuteFunc<T>(_pFn, std::forward<_Args>(args)...);
-        if constexpr (std::is_same_v<T, NTSTATUS>) {
-            NTSTATUSHANDLER<T, NormalStatus> handler(ret);
-        }
-        return ret; 
+    template <class... _Args> decltype(auto) operator()(_Args&&... args) {//有参数
+        if constexpr (std::is_same_v<T, void>) {
+            ExecuteFunc(_pFn, std::forward<_Args>(args)...);
+        }else {
+			T ret{};
+			ret = ExecuteFunc<T>(_pFn, std::forward<_Args>(args)...);
+            if constexpr (std::is_same_v<T, NTSTATUS>) {
+				NTSTATUSHANDLER<T, NormalStatus> handler(ret);
+			}
+			return ret;
+		}   
     }
-    T invoke() {
-        T ret{};
-        ret = ExecuteFunc<T>(_pFn);
-        if constexpr (std::is_same_v<T, NTSTATUS>) {
-            NTSTATUSHANDLER<T, NormalStatus> handler(ret);
-        }
-        return ret;
+    decltype(auto) invoke() {
+        if constexpr (std::is_same_v<T, void>) {
+           ExecuteFunc(_pFn);
+        }else{
+           T ret{};
+           ret = ExecuteFunc<T>(_pFn);
+           if constexpr (std::is_same_v<T, NTSTATUS>) {
+               NTSTATUSHANDLER<T, NormalStatus> handler(ret);
+           }
+           return ret;
+        } 
     }
     template<class U> operator U() { return function<U>(_pFn); }
     void* operator &() { return static_cast<void*>(_pFn); }
@@ -210,77 +218,17 @@ public:
     void* funcptr() { return reinterpret_cast<void*>(_pFn); }
     operator bool() { return _pFn != nullptr; }
     size_t Size() { return GetLength((BYTE*)_pFn); }
-    
-    
 private:
-    template <class Ty = int, class F, class... Args> [[nodiscard]] decltype(auto) ExecuteFunc(F f, Args...args) {
-        using FunctionType = Ty(__stdcall*)(Args...);
-        return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))(args...) : Ty();//__stdcall 
-    }
-
-    template <class Ty = int, class F> [[nodiscard]] decltype(auto) ExecuteFunc(F f) {
-        using FunctionType = Ty(__stdcall*)();
-        return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))() : Ty();//__stdcall 
-    }
-};
-template<>
-class function<void> {
-    using FnPtr = void(*)();
-public:
-    FnPtr _pFn = nullptr;
-    function() = default;
-    function(function&& other) : _pFn(other._pFn) {
-        other._pFn = nullptr;
-    }
-    function(void* pfn) {
-        _pFn = (FnPtr)pfn;
-    }
-    ~function() {  }
-    template <class... Args>
-    void operator()(Args&&... args) {
-        ExecuteFunc(_pFn, std::forward<Args>(args)...);
-    }
-    void invoke() {
-        ExecuteFunc(_pFn);
-    }
-    template<class U> operator U() { return function<U>(_pFn); }
-    void* operator &() { return static_cast<void*>(_pFn); }
-    bool operator==(const function& other) {
-        return _pFn == other._pFn;
-    }
-    bool operator!=(const function& other) {
-        return _pFn != other._pFn;
-    }
-    function& operator=(const function& other) {
-        _pFn = other._pFn;
-        return *this;
-    }
-    function& operator=(function&& other) noexcept {
-        _pFn = other._pFn;
-        other._pFn = nullptr;
-        return *this;
-    }
-    void* funcptr() { return reinterpret_cast<void*>(_pFn); }
-    operator bool() { return _pFn != nullptr; }
-private:
-    template <class F, class... Args> void ExecuteFunc(F f, Args...args) {
-        using FunctionType = void(__stdcall*)(Args...);
-        FunctionType ret = nullptr;
-        if ((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) {
-            ret = reinterpret_cast<FunctionType>(f);
-            ret(args...);
-        }
-    }
-    template <class F> void ExecuteFunc(F f) {
-        using FunctionType = void(__stdcall*)();
-        FunctionType ret = nullptr;
-        if ((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) {
-            ret = reinterpret_cast<FunctionType>(f);
-            ret();
+    template <class Ty = int, class F, class... Args> [[nodiscard]] decltype(auto) ExecuteFunc(F f, Args&&...args) {
+        if constexpr (sizeof...(Args)) {
+            using FunctionType = Ty(__stdcall*)(Args...);
+			return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))(std::forward<Args>(args)...) : Ty();//__stdcall 
+		}else {
+			using FunctionType = Ty(__stdcall*)();
+			return((UDWORD)f > USERADDR_MIN && (UDWORD)f < USERADDR_MAX) ? FunctionType(reinterpret_cast<FunctionType>(f))() : Ty();//__stdcall     
         }
     }
 };
-
 #pragma region NATIVE API
     EXPORT DWORD NTAPI RtlNtStatusToDosError(
         IN    NTSTATUS status
